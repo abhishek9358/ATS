@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ATS Resume Analyzer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100">
+    <div class="container mx-auto px-4 py-8 max-w-4xl">
+        <h1 class="text-3xl font-bold text-center mb-8">ATS Resume Analyzer</h1>
+        
+        <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+            <form id="resumeForm" class="space-y-6">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Upload Resume</label>
+                    <div class="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-lg">
+                        <div class="space-y-1 text-center">
+                            <div class="flex text-sm text-gray-600">
+                                <label for="resume" class="relative cursor-pointer bg-white rounded-md font-medium text-blue-600 hover:text-blue-500">
+                                    <span>Upload a file</span>
+                                    <input id="resume" name="resume" type="file" class="sr-only" accept=".pdf,.docx">
+                                </label>
+                                <p class="pl-1">or drag and drop</p>
+                            </div>
+                            <p class="text-xs text-gray-500">PDF or DOCX up to 10MB</p>
+                        </div>
+                    </div>
+                    <p id="selectedFile" class="mt-2 text-sm text-gray-500"></p>
+                </div>
+
+                <div>
+                    <label for="jobDescription" class="block text-sm font-medium text-gray-700 mb-2">Job Description</label>
+                    <textarea id="jobDescription" name="jobDescription" rows="6" 
+                        class="shadow-sm focus:ring-blue-500 focus:border-blue-500 mt-1 block w-full sm:text-sm border border-gray-300 rounded-lg p-2"
+                        placeholder="Paste the job description here..."></textarea>
+                </div>
+
+                <button type="submit" 
+                    class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                    Analyze Resume
+                </button>
+            </form>
+        </div>
+
+        <div id="results" class="bg-white rounded-lg shadow-lg p-6 hidden">
+            <h2 class="text-xl font-bold mb-4">Analysis Results</h2>
+            
+            <div class="mb-6">
+                <h3 class="font-medium mb-2">ATS Score</h3>
+                <div class="w-full bg-gray-200 rounded-full h-4">
+                    <div id="scoreBar" class="bg-blue-600 rounded-full h-4" style="width: 0%"></div>
+                </div>
+                <p id="scoreText" class="text-right mt-1">0%</p>
+            </div>
+
+            <div id="keywordsSection" class="hidden">
+                <h3 class="font-medium mb-2">Missing Keywords</h3>
+                <div id="keywordsList" class="flex flex-wrap gap-2">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('resume').addEventListener('change', function(e) {
+            const fileName = e.target.files[0]?.name;
+            document.getElementById('selectedFile').textContent = fileName ? `Selected file: ${fileName}` : '';
+        });
+
+        document.getElementById('resumeForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData();
+            const resume = document.getElementById('resume').files[0];
+            const jobDescription = document.getElementById('jobDescription').value;
+
+            if (!resume || !jobDescription) {
+                alert('Please provide both resume and job description');
+                return;
+            }
+
+            formData.append('resume', resume);
+            formData.append('job_description', jobDescription);
+
+            try {
+                const response = await fetch('/analyze', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (data.error) {
+                    throw new Error(data.error);
+                }
+
+                // Show results
+                document.getElementById('results').classList.remove('hidden');
+                
+                // Update score
+                const score = data.ats_score.score;
+                document.getElementById('scoreBar').style.width = `${score}%`;
+                document.getElementById('scoreText').textContent = `${score}%`;
+
+                // Update keywords
+                const keywordsSection = document.getElementById('keywordsSection');
+                const keywordsList = document.getElementById('keywordsList');
+                
+                if (data.ats_score.missing_keywords.length > 0) {
+                    keywordsSection.classList.remove('hidden');
+                    keywordsList.innerHTML = data.ats_score.missing_keywords
+                        .map(keyword => `
+                            <span class="bg-gray-100 px-2 py-1 rounded-full text-sm">
+                                ${keyword}
+                            </span>
+                        `).join('');
+                } else {
+                    keywordsSection.classList.add('hidden');
+                }
+
+            } catch (error) {
+                alert(error.message || 'An error occurred during analysis');
+            }
+        });
+    </script>
+</body>
+</html>
